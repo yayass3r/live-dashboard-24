@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-// Global state - persists in serverless
+// Global state
 declare global {
   var miningState: {
     workers: number
@@ -16,7 +16,6 @@ declare global {
   }
 }
 
-// Initialize
 if (!global.miningState) {
   global.miningState = {
     workers: 5,
@@ -44,15 +43,15 @@ function updateMining() {
   const now = Date.now()
   const elapsed = (now - state.lastUpdate) / 1000
   
-  if (elapsed > 0.5) {
-    // Update workers
+  // Simulate mining progress based on elapsed time
+  if (elapsed > 0.1) {
     state.workersList.forEach(w => {
       w.rate = Math.max(50, Math.min(150, w.rate + (Math.random() - 0.5) * 10))
-      const newShares = Math.floor(Math.random() * 3 * elapsed)
+      const newShares = Math.floor(Math.random() * 5 * Math.max(1, elapsed))
       w.shares += newShares
       state.shares += newShares
       
-      if (newShares > 0 && Math.random() > 0.5) {
+      if (newShares > 0) {
         state.recentActivity.unshift({
           worker: w.name,
           time: new Date().toISOString(),
@@ -61,16 +60,14 @@ function updateMining() {
       }
     })
     
-    // Keep only last 20 activities
-    if (state.recentActivity.length > 20) {
-      state.recentActivity = state.recentActivity.slice(0, 20)
+    if (state.recentActivity.length > 50) {
+      state.recentActivity = state.recentActivity.slice(0, 50)
     }
     
-    // Update rate
     state.rate = state.workersList.reduce((sum, w) => sum + w.rate, 0)
     
-    // Random block found (rare)
-    if (Math.random() < 0.0001 * elapsed) {
+    // Random block (very rare)
+    if (Math.random() < 0.00005 * Math.max(1, elapsed)) {
       state.blocks++
     }
     
@@ -81,7 +78,6 @@ function updateMining() {
 
 export async function GET() {
   updateMining()
-  
   return NextResponse.json({
     workers: state.workers,
     shares: state.shares,
@@ -90,15 +86,14 @@ export async function GET() {
     uptime: state.uptime,
     address: state.address,
     workersList: state.workersList,
-    recentActivity: state.recentActivity.slice(0, 10),
+    recentActivity: state.recentActivity.slice(0, 15),
     isLive: true,
-    lastUpdate: state.lastUpdate
+    timestamp: Date.now()
   })
 }
 
 export async function POST(request: Request) {
   const body = await request.json()
-  
   if (body.action === 'add_worker') {
     const newId = state.workersList.length + 1
     state.workersList.push({
@@ -109,7 +104,6 @@ export async function POST(request: Request) {
     })
     state.workers = state.workersList.length
   }
-  
   updateMining()
   return NextResponse.json({ success: true, workers: state.workers })
 }
